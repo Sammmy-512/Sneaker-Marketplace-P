@@ -59,17 +59,13 @@ export default function Login() {
                                         <label className="fw-semibold mb-2">Email Address</label>
                                         <input type="email" className="form-control form-control-lg bg-body-tertiary border" placeholder="name@gmail.com"
                                         {...register("email", {required: true})}/>
-                                        {errors.email?.type === "required" && <p className="alert">Email is required</p>}
+                                        {errors.email?.type === "required" && <p className="mt-1 m-2 text-danger">Email is required</p>}
                                     </div>
                                     
                                     <div className="mb-4">
                                         <label className="fw-semibold mb-2">Password</label>
-                                        <input 
-                                            type="password" 
-                                            className="form-control form-control-lg bg-body-tertiary border" 
-                                            placeholder="••••••••" 
-                                            {...register("password", { required: true })} 
-                                        />
+                                        <input type="password" className="form-control form-control-lg bg-body-tertiary border" placeholder="••••••••"  {...register("password", { required: true })} />
+                                        {errors.password?.type === "required" && <p className="mt-1 m-2 text-danger">Password is required</p>}
                                     </div>
 
                                     <button type="submit" className="btn btn-primary w-100 rounded-pill fw-bold py-2 fs-5 shadow-sm">
