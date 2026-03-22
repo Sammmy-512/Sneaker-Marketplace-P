@@ -53,7 +53,7 @@ export default function Vault() {
                     {error && (
                         <div className="alert alert-danger shadow-sm border-0 premium-card p-4" role="alert">
                         <h5 className="alert-heading fw-bold">Authentication Required</h5>
-                        <p className="mb-0">Please ensure you are logged in and the backend server is running to view your vault.</p>
+                        <p className="mb-0">Please ensure you are logged in, in order to access your vault!</p>
                     </div>
                     )}
 
