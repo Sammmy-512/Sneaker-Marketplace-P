@@ -5,10 +5,4 @@ dist/
 build/
 
 
-venv/
-__pycache__/
-*.pyc
-.env
-.env.*
-instance/
-.pytest_cache/
+
