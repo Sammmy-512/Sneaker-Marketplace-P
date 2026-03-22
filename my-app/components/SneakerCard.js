@@ -1,4 +1,4 @@
-import {Card, Carousel} from 'react-bootstrap'
+import {Card, Carousel, Badge} from 'react-bootstrap'
 
 export default function SneakerCard({sneaker}) {
     const isDeal = sneaker.price < sneaker.avgMarketPrice
