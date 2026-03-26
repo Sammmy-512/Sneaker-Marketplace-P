@@ -55,5 +55,6 @@ class Sneaker(db.Model):
                 "front": self.image_front,
                 "side": self.image_side,
                 "sole": self.image_sole
-            }
+            },
+            "isPublic": self.is_public_listing
         }

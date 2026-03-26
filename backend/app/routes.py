@@ -1,4 +1,6 @@
-from flask import Blueprint, jsonify, request
+import os
+from werkzeug.utils import secure_filename
+from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -76,8 +78,7 @@ def get_vault():
     current_user_id = int(get_jwt_identity())
 
     sneakers = Sneaker.query.filter_by(
-        owner_id=current_user_id,
-        is_public_listing=False
+        owner_id=current_user_id
     ).all()
 
     return jsonify([sneaker.to_dict() for sneaker in sneakers]), 200
@@ -87,23 +88,32 @@ def get_vault():
 @jwt_required()
 def add_to_vault():
     current_user_id = int(get_jwt_identity())
-    data = request.get_json()
-
-    brand = data.get("brand")
-    model = data.get("model")
-    condition = data.get("condition")
-    size = data.get("size")
-    price = data.get("price")
-    avg_market_price = data.get("avgMarketPrice")
-    original_box = data.get("originalBox", False)
-
-    images = data.get("images", {})
-    image_front = images.get("front")
-    image_side = images.get("side")
-    image_sole = images.get("sole")
+    
+    brand = request.form.get("brand")
+    model = request.form.get("model")
+    condition = request.form.get("condition")
+    size = request.form.get("size")
+    price = request.form.get("price")
+    avg_market_price = request.form.get("avgMarketPrice")
+    
+    original_box_str = request.form.get("originalBox", "false")
+    original_box = original_box_str.lower() == "true"
 
     if not brand or not model or condition is None or size is None or price is None:
         return jsonify({"message": "Missing required sneaker fields"}), 400
+
+    def save_image(image_file):
+        if image_file and image_file.filename:
+            filename = secure_filename(image_file.filename)
+            unique_filename = f"{current_user_id}_{filename}"
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
+            image_file.save(filepath)
+            return f"http://localhost:5000/static/uploads/{unique_filename}"
+        return None
+
+    image_front = save_image(request.files.get("image_front"))
+    image_side = save_image(request.files.get("image_side"))
+    image_sole = save_image(request.files.get("image_sole"))
 
     sneaker = Sneaker(
         owner_id=current_user_id,
@@ -124,6 +134,48 @@ def add_to_vault():
     db.session.commit()
 
     return jsonify(sneaker.to_dict()), 201
+
+
+@main.route("/api/vault/<int:sneaker_id>/list", methods=["PUT"])
+@jwt_required()
+def list_sneaker(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+        
+    sneaker.is_public_listing = True
+    db.session.commit()
+    
+    return jsonify({"message": "Sneaker successfully listed", "sneaker": sneaker.to_dict()}), 200
+
+# Route to delete a sneaker from the vault
+@main.route("/api/vault/<int:sneaker_id>", methods=["DELETE"])
+@jwt_required()
+def delete_sneaker(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+
+    # Cleanup
+    for attr in ['image_front', 'image_side', 'image_sole']:
+        img_url = getattr(sneaker, attr)
+        if img_url:
+            filename = img_url.split('/')[-1]
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+
+    db.session.delete(sneaker)
+    db.session.commit()
+    
+    return jsonify({"message": "Sneaker deleted successfully"}), 200
+
 
 @main.route("/api/sneakers", methods=["GET"])
 def get_sneakers():
@@ -174,5 +226,3 @@ def get_brands():
     brands = db.session.query(Sneaker.brand).filter_by(is_public_listing=True).distinct().all()
     brand_list = [brand[0] for brand in brands]
     return jsonify(brand_list), 200
-        
-

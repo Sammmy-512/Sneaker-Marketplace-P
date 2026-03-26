@@ -1,0 +1,22 @@
+# --- Backend (Python/Flask) ---
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/*.pyc
+backend/instance/
+backend/.pytest_cache/
+
+backend/app/static/uploads/*
+!backend/app/static/uploads/.gitkeep
+
+
+my-app/node_modules/
+my-app/.next/
+my-app/.env.local
+my-app/out/
+my-app/build/
+
+# --- General ---
+.DS_Store
+Thumbs.db
+.vscode/
