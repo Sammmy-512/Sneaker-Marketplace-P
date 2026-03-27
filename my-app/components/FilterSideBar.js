@@ -12,7 +12,7 @@ const fetcher = async (url) => {
 export default function FilterSideBar() {
     const [, setGlobalFilters] = useAtom(filterAtom)
 
-    const {data: brandsList, error: brandsError, isLoading: brandsLoading} = useSWR('http://localhost:5000/api/brands', fetcher)
+    const {data: brandsList, error: brandsError, isLoading: brandsLoading} = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/brands`, fetcher)
 
     const {register, handleSubmit, formState: {errors}} = useForm({
         defaultValues: {

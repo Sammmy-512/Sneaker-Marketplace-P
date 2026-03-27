@@ -43,7 +43,7 @@ export default function MarketPlaceHome() {
     return queryParams.toString()
   }
   
-  const apiURL = `http://localhost:5000/api/sneakers?${buildQueryString()}`
+  const apiURL = `${process.env.NEXT_PUBLIC_API_URL}/api/sneakers?${buildQueryString()}`
   // SWR
   const {data: sneakers, error, isLoading} = useSwr(apiURL, fetcher)
 

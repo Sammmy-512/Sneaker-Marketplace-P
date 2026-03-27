@@ -6,7 +6,7 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
     const handleListSneaker = async () => {
         const token = localStorage.getItem('access_token');
         try {
-            const response = await fetch(`http://localhost:5000/api/vault/${sneaker.id}/list`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/list`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`
@@ -29,7 +29,7 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
 
         const token = localStorage.getItem('access_token');
         try {
-            const response = await fetch(`http://localhost:5000/api/vault/${sneaker.id}`, {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`

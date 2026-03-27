@@ -11,6 +11,8 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     sneakers = db.relationship("Sneaker", backref="owner", lazy=True)
+    notifications = db.relationship("Notification", backref="user", lazy=True)
+    wishlist_criteria = db.relationship("WishlistCriteria", backref="user", lazy=True)
 
     def to_dict(self):
         return {
@@ -44,6 +46,7 @@ class Sneaker(db.Model):
     def to_dict(self):
         return {
             "id": self.id,
+            "ownerId": self.owner_id,
             "brand": self.brand,
             "model": self.model,
             "condition": self.condition_grade,
@@ -57,4 +60,52 @@ class Sneaker(db.Model):
                 "sole": self.image_sole
             },
             "isPublic": self.is_public_listing
+        }
+
+
+class Notification(db.Model):
+    __tablename__ = "notifications"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    is_read = db.Column(db.Boolean, default=False)
+    sneaker_id = db.Column(db.Integer, db.ForeignKey("sneakers.id"), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "message": self.message,
+            "isRead": self.is_read,
+            "sneakerId": self.sneaker_id,
+            "createdAt": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class WishlistCriteria(db.Model):
+    __tablename__ = "wishlist_criteria"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    label = db.Column(db.String(100), nullable=False)
+    brand = db.Column(db.String(100), nullable=True)
+    model_keyword = db.Column(db.String(100), nullable=True)
+    min_size = db.Column(db.Float, nullable=True)
+    max_size = db.Column(db.Float, nullable=True)
+    min_price = db.Column(db.Numeric(10, 2), nullable=True)
+    max_price = db.Column(db.Numeric(10, 2), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "label": self.label,
+            "brand": self.brand,
+            "modelKeyword": self.model_keyword,
+            "minSize": self.min_size,
+            "maxSize": self.max_size,
+            "minPrice": float(self.min_price) if self.min_price is not None else None,
+            "maxPrice": float(self.max_price) if self.max_price is not None else None,
+            "createdAt": self.created_at.isoformat() if self.created_at else None
         }

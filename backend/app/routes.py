@@ -5,7 +5,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
-from app.models import User, Sneaker
+from app.models import User, Sneaker, Notification, WishlistCriteria
 
 main = Blueprint("main", __name__)
 
@@ -140,15 +140,46 @@ def add_to_vault():
 @jwt_required()
 def list_sneaker(sneaker_id):
     current_user_id = int(get_jwt_identity())
-    
+
     sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
-    
+
     if not sneaker:
         return jsonify({"message": "Sneaker not found or unauthorized"}), 404
-        
+
     sneaker.is_public_listing = True
+
+    # Notify the seller
+    seller_notif = Notification(
+        user_id=current_user_id,
+        message=f"Your {sneaker.brand} {sneaker.model} (Size {sneaker.size}) is now live on the marketplace!",
+        sneaker_id=sneaker.id
+    )
+    db.session.add(seller_notif)
+
+    # Notify buyers whose wishlist criteria match this sneaker
+    all_criteria = WishlistCriteria.query.filter(WishlistCriteria.user_id != current_user_id).all()
+    for criteria in all_criteria:
+        if criteria.brand and criteria.brand.lower() != sneaker.brand.lower():
+            continue
+        if criteria.model_keyword and criteria.model_keyword.lower() not in sneaker.model.lower():
+            continue
+        if criteria.min_size and sneaker.size < criteria.min_size:
+            continue
+        if criteria.max_size and sneaker.size > criteria.max_size:
+            continue
+        if criteria.min_price and float(sneaker.price) < float(criteria.min_price):
+            continue
+        if criteria.max_price and float(sneaker.price) > float(criteria.max_price):
+            continue
+        buyer_notif = Notification(
+            user_id=criteria.user_id,
+            message=f"New match for your wishlist \"{criteria.label}\": {sneaker.brand} {sneaker.model}, Size {sneaker.size}, ${float(sneaker.price):.2f}",
+            sneaker_id=sneaker.id
+        )
+        db.session.add(buyer_notif)
+
     db.session.commit()
-    
+
     return jsonify({"message": "Sneaker successfully listed", "sneaker": sneaker.to_dict()}), 200
 
 # Route to delete a sneaker from the vault
@@ -219,6 +250,78 @@ def get_sneakers():
     sneakers = query.all()
 
     return jsonify([sneaker.to_dict() for sneaker in sneakers]), 200
+
+
+@main.route("/api/notifications", methods=["GET"])
+@jwt_required()
+def get_notifications():
+    current_user_id = int(get_jwt_identity())
+    notifications = Notification.query.filter_by(user_id=current_user_id).order_by(Notification.created_at.desc()).all()
+    return jsonify([n.to_dict() for n in notifications]), 200
+
+
+@main.route("/api/notifications/<int:notif_id>/read", methods=["PUT"])
+@jwt_required()
+def mark_notification_read(notif_id):
+    current_user_id = int(get_jwt_identity())
+    notif = Notification.query.filter_by(id=notif_id, user_id=current_user_id).first()
+    if not notif:
+        return jsonify({"message": "Notification not found"}), 404
+    notif.is_read = True
+    db.session.commit()
+    return jsonify({"message": "Marked as read"}), 200
+
+
+@main.route("/api/notifications/read-all", methods=["PUT"])
+@jwt_required()
+def mark_all_notifications_read():
+    current_user_id = int(get_jwt_identity())
+    Notification.query.filter_by(user_id=current_user_id, is_read=False).update({"is_read": True})
+    db.session.commit()
+    return jsonify({"message": "All notifications marked as read"}), 200
+
+
+@main.route("/api/wishlist", methods=["GET"])
+@jwt_required()
+def get_wishlist():
+    current_user_id = int(get_jwt_identity())
+    criteria = WishlistCriteria.query.filter_by(user_id=current_user_id).order_by(WishlistCriteria.created_at.desc()).all()
+    return jsonify([c.to_dict() for c in criteria]), 200
+
+
+@main.route("/api/wishlist", methods=["POST"])
+@jwt_required()
+def add_wishlist():
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    label = data.get("label", "").strip()
+    if not label:
+        return jsonify({"message": "Label is required"}), 400
+    criteria = WishlistCriteria(
+        user_id=current_user_id,
+        label=label,
+        brand=data.get("brand") or None,
+        model_keyword=data.get("modelKeyword") or None,
+        min_size=data.get("minSize") or None,
+        max_size=data.get("maxSize") or None,
+        min_price=data.get("minPrice") or None,
+        max_price=data.get("maxPrice") or None,
+    )
+    db.session.add(criteria)
+    db.session.commit()
+    return jsonify(criteria.to_dict()), 201
+
+
+@main.route("/api/wishlist/<int:criteria_id>", methods=["DELETE"])
+@jwt_required()
+def delete_wishlist(criteria_id):
+    current_user_id = int(get_jwt_identity())
+    criteria = WishlistCriteria.query.filter_by(id=criteria_id, user_id=current_user_id).first()
+    if not criteria:
+        return jsonify({"message": "Criteria not found"}), 404
+    db.session.delete(criteria)
+    db.session.commit()
+    return jsonify({"message": "Deleted"}), 200
 
 
 @main.route("/api/brands", methods=["GET"])

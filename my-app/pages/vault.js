@@ -33,7 +33,7 @@ export default function Vault() {
     const { register, handleSubmit, reset } = useForm();
 
     // Fetch Vault Data
-    const { data: sneakers, error, isLoading, mutate } = useSWR('http://localhost:5000/api/vault', fetcherWithToken);
+    const { data: sneakers, error, isLoading, mutate } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/vault`, fetcherWithToken);
 
     useEffect(() => {
         document.documentElement.setAttribute('data-bs-theme', theme);
@@ -100,7 +100,7 @@ export default function Vault() {
             if (uploadedFiles[1]) formData.append("image_side", uploadedFiles[1]);
             if (uploadedFiles[2]) formData.append("image_sole", uploadedFiles[2]);
 
-            const response = await fetch('http://localhost:5000/api/vault', {
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`
