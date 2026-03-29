@@ -77,6 +77,7 @@ export default function TopNavBar() {
                         <Nav.Link as={Link} href="/vault" className="fw-semibold text-body">My Vault</Nav.Link>
                         <Nav.Link as={Link} href="/wishlist" className="fw-semibold text-body">Wishlist</Nav.Link>
                         <Nav.Link as={Link} href="/login" className="fw-semibold text-body">Login</Nav.Link>
+                        <Nav.Link as={Link} href="/registration" className="fw-semibold text-body">Registration</Nav.Link>
 
                         {/* Notification Bell */}
                         {isLoggedIn && (

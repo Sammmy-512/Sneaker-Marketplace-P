@@ -5,6 +5,8 @@ import { useEffect } from "react";
 import { useAtomValue } from "jotai";
 import { themeAtom } from "@/store/store";
 import { useRouter } from "next/router";
+import { authenticateUser } from "@/lib/authenticate";
+
 
 export default function Login() {
     const theme = useAtomValue(themeAtom)
@@ -33,7 +35,7 @@ export default function Login() {
 
                 localStorage.setItem('access_token', result.access_token)
 
-                router.push('/vault')
+                router.push('/')
             } catch(err) {
                 console.log(err)
                 alert('Invalid Credentials!')

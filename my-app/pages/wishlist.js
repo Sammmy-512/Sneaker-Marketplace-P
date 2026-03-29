@@ -5,6 +5,7 @@ import { useAtomValue } from "jotai";
 import { themeAtom } from "@/store/store";
 import useSWR from "swr";
 import { useRouter } from "next/router";
+import { isAuthenticated } from "@/lib/authenticate";
 
 const fetcher = (url) => {
     const token = localStorage.getItem("access_token");
@@ -15,13 +16,19 @@ const fetcher = (url) => {
 };
 
 export default function Wishlist() {
-    const theme = useAtomValue(themeAtom);
     const router = useRouter();
+    
+
+    const theme = useAtomValue(themeAtom);
+    
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [form, setForm] = useState({ label: "", brand: "", modelKeyword: "", minSize: "", maxSize: "", minPrice: "", maxPrice: "" });
 
     useEffect(() => {
+        if (isAuthenticated()) {
+        router.push("/login");
+    }
         document.documentElement.setAttribute("data-bs-theme", theme);
         if (!localStorage.getItem("access_token")) router.push("/login");
     }, [theme]);

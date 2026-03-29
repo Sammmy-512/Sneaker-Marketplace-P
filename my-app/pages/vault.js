@@ -6,6 +6,8 @@ import { Container, Row, Col, Modal, Form, Button, Badge } from "react-bootstrap
 import TopNavBar from "@/components/TopNavBar";
 import SneakerCard from "@/components/SneakerCard";
 import { useForm } from "react-hook-form";
+import { isAuthenticated } from "@/lib/authenticate";
+import { useRouter } from "next/router";
 
 // SWR Fetcher
 const fetcherWithToken = async(url) => {
@@ -21,6 +23,8 @@ const fetcherWithToken = async(url) => {
 }
 
 export default function Vault() {
+    const router = useRouter()
+    
     const theme = useAtomValue(themeAtom);
     
     // Drag & Drop
@@ -36,6 +40,9 @@ export default function Vault() {
     const { data: sneakers, error, isLoading, mutate } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/vault`, fetcherWithToken);
 
     useEffect(() => {
+        if (isAuthenticated()) {
+        router.push("/login");
+    }
         document.documentElement.setAttribute('data-bs-theme', theme);
     }, [theme]);
 
