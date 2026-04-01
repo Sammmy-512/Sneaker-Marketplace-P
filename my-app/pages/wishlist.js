@@ -26,11 +26,11 @@ export default function Wishlist() {
     const [form, setForm] = useState({ label: "", brand: "", modelKeyword: "", minSize: "", maxSize: "", minPrice: "", maxPrice: "" });
 
     useEffect(() => {
-        if (isAuthenticated()) {
+        if (!isAuthenticated()) {
         router.push("/login");
     }
         document.documentElement.setAttribute("data-bs-theme", theme);
-        if (!localStorage.getItem("access_token")) router.push("/login");
+        //if (!localStorage.getItem("access_token")) router.push("/login");
     }, [theme]);
 
     const { data: wishlist, mutate } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist`, fetcher);

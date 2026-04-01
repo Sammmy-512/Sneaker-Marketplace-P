@@ -40,7 +40,7 @@ export default function Vault() {
     const { data: sneakers, error, isLoading, mutate } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/vault`, fetcherWithToken);
 
     useEffect(() => {
-        if (isAuthenticated()) {
+        if (!isAuthenticated()) {
         router.push("/login");
     }
         document.documentElement.setAttribute('data-bs-theme', theme);
