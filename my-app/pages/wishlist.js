@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Container, Card, Row, Col, Badge, Button, Form, Modal } from "react-bootstrap";
+import { Container, Card, Row, Col, Badge, Button, Form, Modal, Nav } from "react-bootstrap";
 import TopNavBar from "@/components/TopNavBar";
 import { useAtomValue } from "jotai";
 import { themeAtom } from "@/store/store";
@@ -17,23 +17,19 @@ const fetcher = (url) => {
 
 export default function Wishlist() {
     const router = useRouter();
-    
-
     const theme = useAtomValue(themeAtom);
-    
+    const [activeTab, setActiveTab] = useState("wishlist");
     const [showModal, setShowModal] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [form, setForm] = useState({ label: "", brand: "", modelKeyword: "", minSize: "", maxSize: "", minPrice: "", maxPrice: "" });
 
     useEffect(() => {
-        if (!isAuthenticated()) {
-        router.push("/login");
-    }
+        if (!isAuthenticated()) router.push("/login");
         document.documentElement.setAttribute("data-bs-theme", theme);
-        //if (!localStorage.getItem("access_token")) router.push("/login");
     }, [theme]);
 
-    const { data: wishlist, mutate } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist`, fetcher);
+    const { data: wishlist, mutate: mutateWishlist } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist`, fetcher);
+    const { data: priceAlerts, mutate: mutateAlerts } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/price-alerts`, fetcher);
 
     const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -59,16 +55,25 @@ export default function Wishlist() {
         setForm({ label: "", brand: "", modelKeyword: "", minSize: "", maxSize: "", minPrice: "", maxPrice: "" });
         setShowModal(false);
         setSubmitting(false);
-        mutate();
+        mutateWishlist();
     };
 
-    const handleDelete = async (id) => {
+    const handleDeleteWishlist = async (id) => {
         const token = localStorage.getItem("access_token");
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist/${id}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
         });
-        mutate();
+        mutateWishlist();
+    };
+
+    const handleDeleteAlert = async (id) => {
+        const token = localStorage.getItem("access_token");
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/price-alerts/${id}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        mutateAlerts();
     };
 
     return (
@@ -77,61 +82,100 @@ export default function Wishlist() {
             <Container className="py-5">
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <div>
-                        <h2 className="fw-bold mb-1">My Wishlist</h2>
-                        <p className="text-muted mb-0">Save search criteria — get notified when a matching sneaker is listed.</p>
+                        <h2 className="fw-bold mb-1">My Wishlist & Alerts</h2>
+                        <p className="text-muted mb-0">Manage your saved searches and price alerts.</p>
                     </div>
-                    <Button variant="primary" className="rounded-pill px-4 fw-bold" onClick={() => setShowModal(true)}>
-                        + Add Criteria
-                    </Button>
+                    {activeTab === "wishlist" && (
+                        <Button variant="primary" className="rounded-pill px-4 fw-bold" onClick={() => setShowModal(true)}>
+                            + Add Criteria
+                        </Button>
+                    )}
                 </div>
 
-                {!wishlist ? (
-                    <p className="text-muted">Loading...</p>
-                ) : !Array.isArray(wishlist) || wishlist.length === 0 ? (
-                    <Card className="border text-center py-5">
-                        <Card.Body>
-                            <div style={{ fontSize: "2.5rem" }}>🔍</div>
-                            <h5 className="mt-3 fw-bold">No saved criteria yet</h5>
-                            <p className="text-muted">Add criteria to get notified when matching sneakers are listed.</p>
-                        </Card.Body>
-                    </Card>
-                ) : (
-                    <Row className="g-3">
-                        {Array.isArray(wishlist) && wishlist.map((c) => (
-                            <Col key={c.id} md={6} lg={4}>
-                                <Card className="border h-100 shadow-sm">
-                                    <Card.Body>
-                                        <div className="d-flex justify-content-between align-items-start mb-2">
-                                            <h6 className="fw-bold mb-0">{c.label}</h6>
-                                            <Button variant="outline-danger" size="sm" className="rounded-pill px-2 py-0" onClick={() => handleDelete(c.id)}>
-                                                ✕
-                                            </Button>
-                                        </div>
-                                        <div className="d-flex flex-wrap gap-1 mt-2">
-                                            {c.brand && <Badge bg="secondary">{c.brand}</Badge>}
-                                            {c.modelKeyword && <Badge bg="info" text="dark">"{c.modelKeyword}"</Badge>}
-                                            {(c.minSize || c.maxSize) && (
-                                                <Badge bg="light" text="dark" className="border">
-                                                    Size {c.minSize ?? "any"} – {c.maxSize ?? "any"}
-                                                </Badge>
-                                            )}
-                                            {(c.minPrice || c.maxPrice) && (
-                                                <Badge bg="success">
-                                                    ${c.minPrice ?? "0"} – ${c.maxPrice ?? "∞"}
-                                                </Badge>
-                                            )}
-                                            {!c.brand && !c.modelKeyword && !c.minSize && !c.maxSize && !c.minPrice && !c.maxPrice && (
-                                                <span className="text-muted small">Matches any sneaker</span>
-                                            )}
-                                        </div>
-                                        <div className="text-muted mt-2" style={{ fontSize: "0.75rem" }}>
-                                            Added {new Date(c.createdAt).toLocaleDateString()}
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        ))}
-                    </Row>
+                {/* Tabs */}
+                <Nav variant="tabs" className="mb-4" activeKey={activeTab} onSelect={setActiveTab}>
+                    <Nav.Item>
+                        <Nav.Link eventKey="wishlist" className="fw-semibold">🔍 Saved Searches</Nav.Link>
+                    </Nav.Item>
+                    <Nav.Item>
+                        <Nav.Link eventKey="alerts" className="fw-semibold">🔔 Price Alerts</Nav.Link>
+                    </Nav.Item>
+                </Nav>
+
+                {/* Wishlist Tab */}
+                {activeTab === "wishlist" && (
+                    !wishlist ? (
+                        <p className="text-muted">Loading...</p>
+                    ) : !Array.isArray(wishlist) || wishlist.length === 0 ? (
+                        <Card className="border text-center py-5">
+                            <Card.Body>
+                                <div style={{ fontSize: "2.5rem" }}>🔍</div>
+                                <h5 className="mt-3 fw-bold">No saved criteria yet</h5>
+                                <p className="text-muted">Add criteria to get notified when matching sneakers are listed.</p>
+                            </Card.Body>
+                        </Card>
+                    ) : (
+                        <Row className="g-3">
+                            {wishlist.map((c) => (
+                                <Col key={c.id} md={6} lg={4}>
+                                    <Card className="border h-100 shadow-sm">
+                                        <Card.Body>
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 className="fw-bold mb-0">{c.label}</h6>
+                                                <Button variant="outline-danger" size="sm" className="rounded-pill px-2 py-0" onClick={() => handleDeleteWishlist(c.id)}>✕</Button>
+                                            </div>
+                                            <div className="d-flex flex-wrap gap-1 mt-2">
+                                                {c.brand && <Badge bg="secondary">{c.brand}</Badge>}
+                                                {c.modelKeyword && <Badge bg="info" text="dark">"{c.modelKeyword}"</Badge>}
+                                                {(c.minSize || c.maxSize) && <Badge bg="light" text="dark" className="border">Size {c.minSize ?? "any"} – {c.maxSize ?? "any"}</Badge>}
+                                                {(c.minPrice || c.maxPrice) && <Badge bg="success">${c.minPrice ?? "0"} – ${c.maxPrice ?? "∞"}</Badge>}
+                                                {!c.brand && !c.modelKeyword && !c.minSize && !c.maxSize && !c.minPrice && !c.maxPrice && <span className="text-muted small">Matches any sneaker</span>}
+                                            </div>
+                                            <div className="text-muted mt-2" style={{ fontSize: "0.75rem" }}>Added {new Date(c.createdAt).toLocaleDateString()}</div>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            ))}
+                        </Row>
+                    )
+                )}
+
+                {/* Price Alerts Tab */}
+                {activeTab === "alerts" && (
+                    !priceAlerts ? (
+                        <p className="text-muted">Loading...</p>
+                    ) : !Array.isArray(priceAlerts) || priceAlerts.length === 0 ? (
+                        <Card className="border text-center py-5">
+                            <Card.Body>
+                                <div style={{ fontSize: "2.5rem" }}>🔔</div>
+                                <h5 className="mt-3 fw-bold">No price alerts yet</h5>
+                                <p className="text-muted">Click the 🔔 button on any sneaker in the marketplace to set a price alert.</p>
+                            </Card.Body>
+                        </Card>
+                    ) : (
+                        <Row className="g-3">
+                            {priceAlerts.map((a) => (
+                                <Col key={a.id} md={6} lg={4}>
+                                    <Card className="border h-100 shadow-sm">
+                                        <Card.Body>
+                                            <div className="d-flex justify-content-between align-items-start mb-2">
+                                                <h6 className="fw-bold mb-0">{a.sneakerLabel || a.modelKeyword || "All sneakers"}</h6>
+                                                <Button variant="outline-danger" size="sm" className="rounded-pill px-2 py-0" onClick={() => handleDeleteAlert(a.id)}>✕</Button>
+                                            </div>
+                                            <div className="mt-2">
+                                                {a.targetPrice ? (
+                                                    <Badge bg="warning" text="dark">Target: ${a.targetPrice}</Badge>
+                                                ) : (
+                                                    <Badge bg="light" text="dark" className="border">Any price drop</Badge>
+                                                )}
+                                            </div>
+                                            <div className="text-muted mt-2" style={{ fontSize: "0.75rem" }}>Set {new Date(a.createdAt).toLocaleDateString()}</div>
+                                        </Card.Body>
+                                    </Card>
+                                </Col>
+                            ))}
+                        </Row>
+                    )
                 )}
             </Container>
 

@@ -83,6 +83,28 @@ class Notification(db.Model):
         }
 
 
+class PriceAlert(db.Model):
+    __tablename__ = "price_alerts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    sneaker_id = db.Column(db.Integer, db.ForeignKey("sneakers.id"), nullable=True)
+    model_keyword = db.Column(db.String(100), nullable=True)
+    target_price = db.Column(db.Numeric(10, 2), nullable=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "sneakerId": self.sneaker_id,
+            "modelKeyword": self.model_keyword,
+            "targetPrice": float(self.target_price) if self.target_price is not None else None,
+            "isActive": self.is_active,
+            "createdAt": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class WishlistCriteria(db.Model):
     __tablename__ = "wishlist_criteria"
 

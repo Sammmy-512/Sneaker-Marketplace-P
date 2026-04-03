@@ -1,9 +1,52 @@
-import { Card, Carousel, Badge, Button, Modal } from 'react-bootstrap'
+import { Card, Carousel, Badge, Button, Modal, Form } from 'react-bootstrap'
 import Link from "next/link";
 import { useState } from "react";
 export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
   const isDeal = sneaker.price < sneaker.avgMarketPrice;
   const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [showAlertModal, setShowAlertModal] = useState(false);
+  const [targetPrice, setTargetPrice] = useState("");
+  const [alertSaved, setAlertSaved] = useState(false);
+  const [showPriceModal, setShowPriceModal] = useState(false);
+  const [newPrice, setNewPrice] = useState("");
+  const [priceUpdating, setPriceUpdating] = useState(false);
+
+  const handleUpdatePrice = async () => {
+    if (!newPrice || parseFloat(newPrice) <= 0) { alert("Please enter a valid price."); return; }
+    setPriceUpdating(true);
+    const token = localStorage.getItem("access_token");
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/price`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ price: parseFloat(newPrice) }),
+      });
+      if (!res.ok) throw new Error();
+      setShowPriceModal(false);
+      setNewPrice("");
+      if (refreshVault) refreshVault();
+    } catch { alert("Could not update price."); }
+    finally { setPriceUpdating(false); }
+  };
+
+  const handleSetAlert = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) { alert("Please log in to set a price alert."); return; }
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/price-alerts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          sneakerId: sneaker.id,
+          targetPrice: targetPrice ? parseFloat(targetPrice) : null,
+        }),
+      });
+      if (res.status === 409) { alert("You already have an alert for this sneaker."); return; }
+      if (!res.ok) throw new Error();
+      setAlertSaved(true);
+      setTimeout(() => { setShowAlertModal(false); setAlertSaved(false); setTargetPrice(""); }, 1200);
+    } catch { alert("Could not set alert."); }
+  };
   const handleListSneaker = async () => {
     const token = localStorage.getItem("access_token");
     try {
@@ -174,6 +217,16 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           </div>
         </Card.Text>
 
+        {isVaultView && (
+          <Button
+            variant="outline-secondary"
+            size="sm"
+            className="w-100 rounded-pill mb-2"
+            onClick={() => { setNewPrice(sneaker.price); setShowPriceModal(true); }}
+          >
+            ✏️ Edit Price
+          </Button>
+        )}
         {isVaultView && !sneaker.isPublic ? (
           <Button
             variant="success"
@@ -183,12 +236,24 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
             List
           </Button>
         ) : (
-          <Link
-            href={`/sneaker/${sneaker.id}`}
-            className="btn btn-primary w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm text-decoration-none text-center"
-          >
-            View Details
-          </Link>
+          <div className="d-flex gap-2 mt-auto">
+            <Link
+              href={`/sneaker/${sneaker.id}`}
+              className="btn btn-primary flex-grow-1 fw-bold py-2 rounded-pill shadow-sm text-decoration-none text-center"
+            >
+              View Details
+            </Link>
+            {!isVaultView && (
+              <Button
+                variant="outline-warning"
+                className="rounded-pill px-3 fw-bold shadow-sm"
+                onClick={() => setShowAlertModal(true)}
+                title="Set Price Alert"
+              >
+                🔔
+              </Button>
+            )}
+          </div>
         )}
       </Card.Body>
 
@@ -250,6 +315,72 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
             Confirm & List
           </Button>
         </Modal.Footer>
+      </Modal>
+      {/* Edit Price Modal */}
+      <Modal show={showPriceModal} onHide={() => setShowPriceModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fw-bold">✏️ Update Price</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="text-muted small mb-3">
+            Current price: <strong>${parseFloat(sneaker.price).toFixed(2)}</strong>
+            {sneaker.isPublic && " — Buyers with a price alert will be notified if the price drops."}
+          </p>
+          <Form.Group>
+            <Form.Label className="fw-semibold">New Price ($)</Form.Label>
+            <Form.Control
+              type="number"
+              min="0"
+              step="0.01"
+              value={newPrice}
+              onChange={(e) => setNewPrice(e.target.value)}
+              placeholder="Enter new price"
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" className="rounded-pill" onClick={() => setShowPriceModal(false)}>Cancel</Button>
+          <Button variant="primary" className="rounded-pill fw-bold px-4" onClick={handleUpdatePrice} disabled={priceUpdating}>
+            {priceUpdating ? "Saving…" : "Update Price"}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Price Alert Modal */}
+      <Modal show={showAlertModal} onHide={() => { setShowAlertModal(false); setTargetPrice(""); setAlertSaved(false); }} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fw-bold">🔔 Set Price Alert</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {alertSaved ? (
+            <div className="text-center py-3">
+              <div style={{ fontSize: "2rem" }}>✅</div>
+              <p className="fw-bold mt-2">Alert saved!</p>
+            </div>
+          ) : (
+            <>
+              <p className="text-muted small mb-3">
+                You'll be notified when <strong>{sneaker.brand} {sneaker.model}</strong> drops in price.
+              </p>
+              <Form.Group>
+                <Form.Label className="fw-semibold">Target Price (optional)</Form.Label>
+                <Form.Control
+                  type="number"
+                  placeholder={`Only notify me at or below $...`}
+                  value={targetPrice}
+                  onChange={(e) => setTargetPrice(e.target.value)}
+                />
+                <Form.Text className="text-muted">Leave blank to be notified on any price drop.</Form.Text>
+              </Form.Group>
+            </>
+          )}
+        </Modal.Body>
+        {!alertSaved && (
+          <Modal.Footer>
+            <Button variant="secondary" className="rounded-pill" onClick={() => setShowAlertModal(false)}>Cancel</Button>
+            <Button variant="warning" className="rounded-pill fw-bold px-4" onClick={handleSetAlert}>Save Alert</Button>
+          </Modal.Footer>
+        )}
       </Modal>
     </Card>
   );

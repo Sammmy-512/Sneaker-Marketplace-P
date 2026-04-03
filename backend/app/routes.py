@@ -5,7 +5,7 @@ from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identi
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app import db
-from app.models import User, Sneaker, Notification, WishlistCriteria
+from app.models import User, Sneaker, Notification, WishlistCriteria, PriceAlert
 
 main = Blueprint("main", __name__)
 
@@ -320,6 +320,120 @@ def delete_wishlist(criteria_id):
     if not criteria:
         return jsonify({"message": "Criteria not found"}), 404
     db.session.delete(criteria)
+    db.session.commit()
+    return jsonify({"message": "Deleted"}), 200
+
+
+@main.route("/api/vault/<int:sneaker_id>/price", methods=["PUT"])
+@jwt_required()
+def update_price(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+
+    data = request.get_json()
+    new_price = data.get("price")
+    if new_price is None:
+        return jsonify({"message": "Price is required"}), 400
+
+    try:
+        new_price = float(new_price)
+    except ValueError:
+        return jsonify({"message": "Invalid price"}), 400
+
+    old_price = float(sneaker.price)
+    sneaker.price = new_price
+
+    # Only trigger alerts if price dropped and sneaker is publicly listed
+    if sneaker.is_public_listing and new_price < old_price:
+        alerts = PriceAlert.query.filter(
+            PriceAlert.user_id != current_user_id,
+            PriceAlert.is_active == True
+        ).all()
+        for alert in alerts:
+            # Match by specific sneaker
+            if alert.sneaker_id and alert.sneaker_id != sneaker.id:
+                continue
+            # Match by model keyword
+            if alert.model_keyword and alert.model_keyword.lower() not in sneaker.model.lower():
+                continue
+            # Check target price threshold
+            if alert.target_price and new_price > float(alert.target_price):
+                continue
+
+            drop = old_price - new_price
+            msg = (
+                f"Price drop on {sneaker.brand} {sneaker.model} (Size {sneaker.size})! "
+                f"${old_price:.2f} → ${new_price:.2f} (−${drop:.2f})"
+            )
+            if alert.target_price:
+                msg += f" — reached your target of ${float(alert.target_price):.2f}!"
+
+            db.session.add(Notification(
+                user_id=alert.user_id,
+                message=msg,
+                sneaker_id=sneaker.id
+            ))
+
+    db.session.commit()
+    return jsonify(sneaker.to_dict()), 200
+
+
+@main.route("/api/price-alerts", methods=["GET"])
+@jwt_required()
+def get_price_alerts():
+    current_user_id = int(get_jwt_identity())
+    alerts = PriceAlert.query.filter_by(user_id=current_user_id).order_by(PriceAlert.created_at.desc()).all()
+
+    result = []
+    for alert in alerts:
+        d = alert.to_dict()
+        if alert.sneaker_id:
+            sneaker = Sneaker.query.get(alert.sneaker_id)
+            if sneaker:
+                d["sneakerLabel"] = f"{sneaker.brand} {sneaker.model} (Size {sneaker.size}) — ${float(sneaker.price):.2f}"
+        result.append(d)
+    return jsonify(result), 200
+
+
+@main.route("/api/price-alerts", methods=["POST"])
+@jwt_required()
+def add_price_alert():
+    current_user_id = int(get_jwt_identity())
+    data = request.get_json()
+    sneaker_id = data.get("sneakerId")
+    model_keyword = data.get("modelKeyword") or None
+    target_price = data.get("targetPrice") or None
+
+    if not sneaker_id and not model_keyword:
+        return jsonify({"message": "Either sneakerId or modelKeyword is required"}), 400
+
+    # Prevent duplicate alert for same sneaker
+    if sneaker_id:
+        existing = PriceAlert.query.filter_by(user_id=current_user_id, sneaker_id=sneaker_id, is_active=True).first()
+        if existing:
+            return jsonify({"message": "Alert already exists for this sneaker"}), 409
+
+    alert = PriceAlert(
+        user_id=current_user_id,
+        sneaker_id=sneaker_id,
+        model_keyword=model_keyword,
+        target_price=target_price
+    )
+    db.session.add(alert)
+    db.session.commit()
+    return jsonify(alert.to_dict()), 201
+
+
+@main.route("/api/price-alerts/<int:alert_id>", methods=["DELETE"])
+@jwt_required()
+def delete_price_alert(alert_id):
+    current_user_id = int(get_jwt_identity())
+    alert = PriceAlert.query.filter_by(id=alert_id, user_id=current_user_id).first()
+    if not alert:
+        return jsonify({"message": "Alert not found"}), 404
+    db.session.delete(alert)
     db.session.commit()
     return jsonify({"message": "Deleted"}), 200
 
