@@ -329,3 +329,11 @@ def get_brands():
     brands = db.session.query(Sneaker.brand).filter_by(is_public_listing=True).distinct().all()
     brand_list = [brand[0] for brand in brands]
     return jsonify(brand_list), 200
+
+
+@main.route("/api/sneakers/<int:sneaker_id>", methods=["GET"])
+def get_sneaker(sneaker_id):
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, is_public_listing=True).first()
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found"}), 404
+    return jsonify(sneaker.to_dict()), 200
