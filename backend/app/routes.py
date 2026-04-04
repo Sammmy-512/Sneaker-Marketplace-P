@@ -95,6 +95,7 @@ def add_to_vault():
     size = request.form.get("size")
     price = request.form.get("price")
     avg_market_price = request.form.get("avgMarketPrice")
+    quantity = request.form.get("quantity", 1, type=int) # NEW: Capture quantity
     
     original_box_str = request.form.get("originalBox", "false")
     original_box = original_box_str.lower() == "true"
@@ -124,6 +125,8 @@ def add_to_vault():
         size=size,
         price=price,
         avg_market_price=avg_market_price,
+        quantity=quantity, # NEW FEATURE
+        status="draft",    # NEW FEATUTRE
         image_front=image_front,
         image_side=image_side,
         image_sole=image_sole,
@@ -147,6 +150,7 @@ def list_sneaker(sneaker_id):
         return jsonify({"message": "Sneaker not found or unauthorized"}), 404
 
     sneaker.is_public_listing = True
+    sneaker.status = "active" # NEW: Update status when listed
 
     # Notify the seller
     seller_notif = Notification(
@@ -181,6 +185,43 @@ def list_sneaker(sneaker_id):
     db.session.commit()
 
     return jsonify({"message": "Sneaker successfully listed", "sneaker": sneaker.to_dict()}), 200
+
+# NEW: Cancel Listing
+@main.route("/api/vault/<int:sneaker_id>/cancel", methods=["PUT"])
+@jwt_required()
+def cancel_sneaker(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+        
+    sneaker.is_public_listing = False
+    sneaker.status = "cancelled"
+    db.session.commit()
+    
+    return jsonify({"message": "Listing cancelled", "sneaker": sneaker.to_dict()}), 200
+
+# NEW: Relist Inventory
+@main.route("/api/vault/<int:sneaker_id>/relist", methods=["PUT"])
+@jwt_required()
+def relist_sneaker(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+
+    data = request.get_json()
+    new_quantity = data.get("quantity", 1)
+
+    sneaker.quantity = int(new_quantity)
+    sneaker.is_public_listing = True
+    sneaker.status = "active"
+    
+    db.session.commit()
+    
+    return jsonify({"message": "Sneaker relisted successfully", "sneaker": sneaker.to_dict()}), 200
 
 # Route to delete a sneaker from the vault
 @main.route("/api/vault/<int:sneaker_id>", methods=["DELETE"])
