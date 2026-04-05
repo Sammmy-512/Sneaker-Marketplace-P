@@ -492,3 +492,8 @@ def get_sneaker(sneaker_id):
     if not sneaker:
         return jsonify({"message": "Sneaker not found"}), 404
     return jsonify(sneaker.to_dict()), 200
+
+
+
+
+#test to see if the worklow automation will be triggered on the push
