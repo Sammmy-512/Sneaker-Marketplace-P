@@ -64,7 +64,7 @@ export default function TopNavBar() {
     }, []);
 
     return (
-        <Navbar className="bg-body-tertiary shadow-sm border-bottom" sticky="top" expand="md">
+        <Navbar className={`shadow-sm border-bottom ${theme === "light" ? "bg-white" : "bg-dark"}`} sticky="top" expand="md" style={{ zIndex: 1050 }}>
             <Container>
                 <Navbar.Brand as={Link} href="/" className="d-flex align-items-center fw-bold fs-4 text-decoration-none text-body">
                     <img src="/emblem.jpg" alt="Sneaker Marketplace Emblem" width="32" height="32" className="me-2 rounded" />
@@ -97,7 +97,7 @@ export default function TopNavBar() {
                                 </button>
 
                                 {showNotifs && (
-                                    <div className="position-absolute end-0 mt-2 bg-body border rounded shadow-lg" style={{ width: 340, zIndex: 1050, maxHeight: 420, overflowY: "auto" }}>
+                                    <div className="position-absolute end-0 mt-2 bg-body border rounded shadow-lg" style={{ width: 340, zIndex: 1060, maxHeight: 420, overflowY: "auto" }}>
                                         <div className="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
                                             <span className="fw-bold">Notifications</span>
                                             {unreadCount > 0 && (
