@@ -1,9 +1,13 @@
-import { Card, Carousel, Badge, Button, Modal } from 'react-bootstrap'
+import { Card, Carousel, Badge, Button, Modal, Form } from 'react-bootstrap'
 import Link from "next/link";
 import { useState } from "react";
+
 export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
   const isDeal = sneaker.price < sneaker.avgMarketPrice;
   const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [showRelistModal, setShowRelistModal] = useState(false);
+  const [relistQty, setRelistQty] = useState(sneaker.quantity || 1);
+
   const handleListSneaker = async () => {
     const token = localStorage.getItem("access_token");
     try {
@@ -26,6 +30,36 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
       alert("Could not list sneaker");
     }
   };
+
+  const handleRelist = async () => {
+    const token = localStorage.getItem("access_token");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/relist`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ quantity: relistQty })
+      });
+      if (!response.ok) throw new Error("Failed to relist");
+      setShowRelistModal(false);
+      if (refreshVault) refreshVault();
+    } catch (error) {
+      alert("Could not relist");
+    }
+  };
+
+  const handleCancelListing = async () => {
+    const token = localStorage.getItem("access_token");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/cancel`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed to cancel listing");
+      if (refreshVault) refreshVault();
+    } catch (error) {
+      alert("Could not cancel");
+    }
+  }
 
   const handleDeleteSneaker = async () => {
     if (
@@ -107,18 +141,31 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
                 Deal!
               </Badge>
             )}
-            {isVaultView && !sneaker.isPublic && (
+            
+            {isVaultView && (sneaker.status === "draft" || (!sneaker.status && !sneaker.isPublic)) && (
               <Badge bg="secondary" className="px-2 py-1 shadow-sm">
                 Draft
               </Badge>
             )}
-            {isVaultView && sneaker.isPublic && (
+            
+            {isVaultView && (sneaker.status === "active" || (!sneaker.status && sneaker.isPublic)) && (
               <Badge bg="success" className="px-2 py-1 shadow-sm">
                 Live
               </Badge>
             )}
 
-            {/*The Delete Button */}
+            {isVaultView && sneaker.status === "cancelled" && (
+              <Badge bg="danger" className="px-2 py-1 shadow-sm">
+                Cancelled
+              </Badge>
+            )}
+
+            {isVaultView && sneaker.status === "expired" && (
+              <Badge bg="warning" className="px-2 py-1 shadow-sm text-dark">
+                Expired
+              </Badge>
+            )}
+
             {isVaultView && (
               <Button
                 variant="outline-danger"
@@ -149,8 +196,11 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
               <strong className="text-muted">Original Box:</strong>{" "}
               {sneaker.originalBox ? "Yes" : "No"}
             </li>
-            <li>
+            <li className="mb-2">
               <strong className="text-muted">Size:</strong> US {sneaker.size}
+            </li>
+            <li>
+              <strong className="text-muted">Qty Available:</strong> {sneaker.quantity || 1}
             </li>
           </ul>
 
@@ -174,7 +224,7 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           </div>
         </Card.Text>
 
-        {isVaultView && !sneaker.isPublic ? (
+        {isVaultView && (sneaker.status === "draft" || (!sneaker.status && !sneaker.isPublic)) && (
           <Button
             variant="success"
             className="w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm"
@@ -182,7 +232,29 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           >
             List
           </Button>
-        ) : (
+        )}
+
+        {isVaultView && (sneaker.status === "active" || (!sneaker.status && sneaker.isPublic)) && (
+          <Button 
+            variant="outline-danger" 
+            className="w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm" 
+            onClick={handleCancelListing}
+          >
+            Cancel Listing
+          </Button>
+        )}
+
+        {isVaultView && (sneaker.status === "cancelled" || sneaker.status === "expired") && (
+          <Button 
+            variant="primary" 
+            className="w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm" 
+            onClick={() => setShowRelistModal(true)}
+          >
+            ♻️ Relist Items
+          </Button>
+        )}
+
+        {!isVaultView && (
           <Link
             href={`/sneaker/${sneaker.id}`}
             className="btn btn-primary w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm text-decoration-none text-center"
@@ -249,6 +321,22 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           >
             Confirm & List
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal show={showRelistModal} onHide={() => setShowRelistModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="fw-bold">♻️ Relist Inventory</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label className="fw-semibold">Quantity to Relist</Form.Label>
+            <Form.Control type="number" min="1" value={relistQty} onChange={(e) => setRelistQty(e.target.value)} />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" className="rounded-pill" onClick={() => setShowRelistModal(false)}>Cancel</Button>
+          <Button variant="primary" className="rounded-pill fw-bold" onClick={handleRelist}>Confirm Relist</Button>
         </Modal.Footer>
       </Modal>
     </Card>
