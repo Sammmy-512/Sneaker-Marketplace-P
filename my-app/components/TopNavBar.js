@@ -4,6 +4,7 @@ import { themeAtom } from "@/store/store";
 import Link from "next/link";
 import { useState, useEffect, useRef } from "react";
 import useSWR from "swr";
+import { useRouter } from "next/router";
 
 const fetcher = (url) => {
     const token = localStorage.getItem("access_token");
@@ -17,6 +18,7 @@ const fetcher = (url) => {
 export default function TopNavBar() {
     const [theme, setTheme] = useAtom(themeAtom);
     const toggleTheme = () => setTheme((prev) => (prev === "light" ? "dark" : "light"));
+    const router = useRouter();
 
     const [showNotifs, setShowNotifs] = useState(false);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -50,6 +52,14 @@ export default function TopNavBar() {
             headers: { Authorization: `Bearer ${token}` },
         });
         mutate();
+    };
+
+    const handleNotifClick = async (n) => {
+        if (!n.isRead) await markOneRead(n.id);
+        if (n.sneakerId) {
+            setShowNotifs(false);
+            router.push(`/sneaker/${n.sneakerId}`);
+        }
     };
 
     // Close dropdown when clicking outside
@@ -113,12 +123,17 @@ export default function TopNavBar() {
                                                 <div
                                                     key={n.id}
                                                     className={`px-3 py-2 border-bottom small d-flex gap-2 align-items-start ${!n.isRead ? "bg-primary bg-opacity-10" : ""}`}
-                                                    style={{ cursor: n.isRead ? "default" : "pointer" }}
-                                                    onClick={() => !n.isRead && markOneRead(n.id)}
+                                                    style={{ cursor: (n.sneakerId || !n.isRead) ? "pointer" : "default" }}
+                                                    onClick={() => handleNotifClick(n)}
                                                 >
                                                     <span>{n.isRead ? "✉️" : "🔵"}</span>
                                                     <div>
                                                         <div>{n.message}</div>
+                                                        {n.sneakerId && (
+                                                            <div className="text-primary fw-semibold" style={{ fontSize: "0.72rem" }}>
+                                                                View sneaker →
+                                                            </div>
+                                                        )}
                                                         <div className="text-muted" style={{ fontSize: "0.75rem" }}>
                                                             {new Date(n.createdAt).toLocaleString()}
                                                         </div>

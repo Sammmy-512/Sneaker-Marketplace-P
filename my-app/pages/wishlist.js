@@ -6,6 +6,7 @@ import { themeAtom } from "@/store/store";
 import useSWR from "swr";
 import { useRouter } from "next/router";
 import { isAuthenticated } from "@/lib/authenticate";
+import Link from "next/link";
 
 const fetcher = (url) => {
     const token = localStorage.getItem("access_token");
@@ -30,6 +31,21 @@ export default function Wishlist() {
 
     const { data: wishlist, mutate: mutateWishlist } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/wishlist`, fetcher);
     const { data: priceAlerts, mutate: mutateAlerts } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/price-alerts`, fetcher);
+    const { data: notifications, mutate: mutateNotifs } = useSWR(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications`, fetcher, { refreshInterval: 15000 });
+
+    const matchAlerts = Array.isArray(notifications)
+        ? notifications.filter((n) => n.message.startsWith("New match for your wishlist"))
+        : [];
+    const unreadMatchCount = matchAlerts.filter((n) => !n.isRead).length;
+
+    const markMatchRead = async (id) => {
+        const token = localStorage.getItem("access_token");
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/${id}/read`, {
+            method: "PUT",
+            headers: { Authorization: `Bearer ${token}` },
+        });
+        mutateNotifs();
+    };
 
     const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -83,11 +99,11 @@ export default function Wishlist() {
                 <div className="d-flex justify-content-between align-items-center mb-4">
                     <div>
                         <h2 className="fw-bold mb-1">My Wishlist & Alerts</h2>
-                        <p className="text-muted mb-0">Manage your saved searches and price alerts.</p>
+                        <p className="text-muted mb-0">Manage your saved searches, match alerts, and price alerts.</p>
                     </div>
                     {activeTab === "wishlist" && (
                         <Button variant="primary" className="rounded-pill px-4 fw-bold" onClick={() => setShowModal(true)}>
-                            + Add Criteria
+                            + Add Search
                         </Button>
                     )}
                 </div>
@@ -96,6 +112,14 @@ export default function Wishlist() {
                 <Nav variant="tabs" className="mb-4" activeKey={activeTab} onSelect={setActiveTab}>
                     <Nav.Item>
                         <Nav.Link eventKey="wishlist" className="fw-semibold">🔍 Saved Searches</Nav.Link>
+                    </Nav.Item>
+                    <Nav.Item>
+                        <Nav.Link eventKey="matches" className="fw-semibold d-flex align-items-center gap-2">
+                            🎯 Match Alerts
+                            {unreadMatchCount > 0 && (
+                                <Badge bg="danger" pill style={{ fontSize: "0.65rem" }}>{unreadMatchCount}</Badge>
+                            )}
+                        </Nav.Link>
                     </Nav.Item>
                     <Nav.Item>
                         <Nav.Link eventKey="alerts" className="fw-semibold">🔔 Price Alerts</Nav.Link>
@@ -137,6 +161,70 @@ export default function Wishlist() {
                                 </Col>
                             ))}
                         </Row>
+                    )
+                )}
+
+                {/* Match Alerts Tab */}
+                {activeTab === "matches" && (
+                    !notifications ? (
+                        <p className="text-muted">Loading...</p>
+                    ) : matchAlerts.length === 0 ? (
+                        <Card className="border text-center py-5">
+                            <Card.Body>
+                                <div style={{ fontSize: "2.5rem" }}>🎯</div>
+                                <h5 className="mt-3 fw-bold">No match alerts yet</h5>
+                                <p className="text-muted">Save a search above and you'll be notified here whenever a new listing matches your criteria.</p>
+                            </Card.Body>
+                        </Card>
+                    ) : (
+                        <>
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                <p className="text-muted mb-0 small">{matchAlerts.length} listing{matchAlerts.length !== 1 ? "s" : ""} matched your saved searches</p>
+                                {unreadMatchCount > 0 && (
+                                    <Button variant="outline-secondary" size="sm" className="rounded-pill" onClick={async () => {
+                                        const token = localStorage.getItem("access_token");
+                                        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/notifications/read-all`, {
+                                            method: "PUT",
+                                            headers: { Authorization: `Bearer ${token}` },
+                                        });
+                                        mutateNotifs();
+                                    }}>
+                                        Mark all read
+                                    </Button>
+                                )}
+                            </div>
+                            <Row className="g-3">
+                                {matchAlerts.map((n) => (
+                                    <Col key={n.id} md={6} lg={4}>
+                                        <Card className={`border h-100 shadow-sm ${!n.isRead ? "border-primary" : ""}`}>
+                                            <Card.Body>
+                                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                                    <span className="me-2">{n.isRead ? "✉️" : "🔵"}</span>
+                                                    <div className="flex-grow-1 small">{n.message}</div>
+                                                </div>
+                                                <div className="d-flex justify-content-between align-items-center mt-3">
+                                                    <span className="text-muted" style={{ fontSize: "0.75rem" }}>
+                                                        {new Date(n.createdAt).toLocaleString()}
+                                                    </span>
+                                                    <div className="d-flex gap-2">
+                                                        {n.sneakerId && (
+                                                            <Link href={`/sneaker/${n.sneakerId}`} className="btn btn-sm btn-primary rounded-pill px-3">
+                                                                View Listing
+                                                            </Link>
+                                                        )}
+                                                        {!n.isRead && (
+                                                            <Button variant="outline-secondary" size="sm" className="rounded-pill" onClick={() => markMatchRead(n.id)}>
+                                                                Mark read
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </Card.Body>
+                                        </Card>
+                                    </Col>
+                                ))}
+                            </Row>
+                        </>
                     )
                 )}
 
