@@ -38,7 +38,9 @@ class Sneaker(db.Model):
 
     # NEW: Inventory Relisting Fields
     quantity = db.Column(db.Integer, default=1)
-    status = db.Column(db.String(20), default="draft") # draft, active, expired, cancelled
+    
+    # NEW FEATURE: Increased length from 20 to 50 to fit "Sold - Awaiting Shipment"
+    status = db.Column(db.String(50), default="draft") 
 
     image_front = db.Column(db.String(255), nullable=True)
     image_side = db.Column(db.String(255), nullable=True)
@@ -58,8 +60,8 @@ class Sneaker(db.Model):
             "size": self.size,
             "price": float(self.price),
             "avgMarketPrice": float(self.avg_market_price) if self.avg_market_price is not None else None,
-            "quantity": self.quantity,  # NEW STUFF
-            "status": self.status,      # NEW STUFF
+            "quantity": self.quantity,  
+            "status": self.status,      
             "images": {
                 "front": self.image_front,
                 "side": self.image_side,
