@@ -4,7 +4,9 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from app import db
+# NEW FEATURE: Import mail and Message
+from app import db, mail
+from flask_mail import Message
 from app.models import User, Sneaker, Notification, WishlistCriteria, PriceAlert
 
 main = Blueprint("main", __name__)
@@ -95,7 +97,7 @@ def add_to_vault():
     size = request.form.get("size")
     price = request.form.get("price")
     avg_market_price = request.form.get("avgMarketPrice")
-    quantity = request.form.get("quantity", 1, type=int) # NEW: Capture quantity
+    quantity = request.form.get("quantity", 1, type=int) 
     
     original_box_str = request.form.get("originalBox", "false")
     original_box = original_box_str.lower() == "true"
@@ -125,8 +127,8 @@ def add_to_vault():
         size=size,
         price=price,
         avg_market_price=avg_market_price,
-        quantity=quantity, # NEW FEATURE
-        status="draft",    # NEW FEATUTRE
+        quantity=quantity, 
+        status="draft",    
         image_front=image_front,
         image_side=image_side,
         image_sole=image_sole,
@@ -150,7 +152,7 @@ def list_sneaker(sneaker_id):
         return jsonify({"message": "Sneaker not found or unauthorized"}), 404
 
     sneaker.is_public_listing = True
-    sneaker.status = "active" # NEW: Update status when listed
+    sneaker.status = "active" 
 
     # Notify the seller
     seller_notif = Notification(
@@ -186,7 +188,6 @@ def list_sneaker(sneaker_id):
 
     return jsonify({"message": "Sneaker successfully listed", "sneaker": sneaker.to_dict()}), 200
 
-# NEW: Cancel Listing
 @main.route("/api/vault/<int:sneaker_id>/cancel", methods=["PUT"])
 @jwt_required()
 def cancel_sneaker(sneaker_id):
@@ -202,7 +203,6 @@ def cancel_sneaker(sneaker_id):
     
     return jsonify({"message": "Listing cancelled", "sneaker": sneaker.to_dict()}), 200
 
-# NEW: Relist Inventory
 @main.route("/api/vault/<int:sneaker_id>/relist", methods=["PUT"])
 @jwt_required()
 def relist_sneaker(sneaker_id):
@@ -223,7 +223,6 @@ def relist_sneaker(sneaker_id):
     
     return jsonify({"message": "Sneaker relisted successfully", "sneaker": sneaker.to_dict()}), 200
 
-# Route to delete a sneaker from the vault
 @main.route("/api/vault/<int:sneaker_id>", methods=["DELETE"])
 @jwt_required()
 def delete_sneaker(sneaker_id):
@@ -234,14 +233,24 @@ def delete_sneaker(sneaker_id):
     if not sneaker:
         return jsonify({"message": "Sneaker not found or unauthorized"}), 404
 
-    # Cleanup
+    # FIX: Clean up foreign key relationships to prevent database crashes
+    # 1. Delete associated price alerts for this sneaker
+    PriceAlert.query.filter_by(sneaker_id=sneaker.id).delete()
+    
+    # 2. Detach notifications so users keep their message history, but the link is broken
+    notifications = Notification.query.filter_by(sneaker_id=sneaker.id).all()
+    for notif in notifications:
+        notif.sneaker_id = None
+
+    # Cleanup images safely
     for attr in ['image_front', 'image_side', 'image_sole']:
         img_url = getattr(sneaker, attr)
-        if img_url:
+        if img_url and isinstance(img_url, str):
             filename = img_url.split('/')[-1]
-            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-            if os.path.exists(filepath):
-                os.remove(filepath)
+            if filename:
+                filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                if os.path.exists(filepath) and os.path.isfile(filepath):
+                    os.remove(filepath)
 
     db.session.delete(sneaker)
     db.session.commit()
@@ -386,20 +395,16 @@ def update_price(sneaker_id):
     old_price = float(sneaker.price)
     sneaker.price = new_price
 
-    # Only trigger alerts if price dropped and sneaker is publicly listed
     if sneaker.is_public_listing and new_price < old_price:
         alerts = PriceAlert.query.filter(
             PriceAlert.user_id != current_user_id,
             PriceAlert.is_active == True
         ).all()
         for alert in alerts:
-            # Match by specific sneaker
             if alert.sneaker_id and alert.sneaker_id != sneaker.id:
                 continue
-            # Match by model keyword
             if alert.model_keyword and alert.model_keyword.lower() not in sneaker.model.lower():
                 continue
-            # Check target price threshold
             if alert.target_price and new_price > float(alert.target_price):
                 continue
 
@@ -450,7 +455,6 @@ def add_price_alert():
     if not sneaker_id and not model_keyword:
         return jsonify({"message": "Either sneakerId or modelKeyword is required"}), 400
 
-    # Prevent duplicate alert for same sneaker
     if sneaker_id:
         existing = PriceAlert.query.filter_by(user_id=current_user_id, sneaker_id=sneaker_id, is_active=True).first()
         if existing:
@@ -494,6 +498,66 @@ def get_sneaker(sneaker_id):
     return jsonify(sneaker.to_dict()), 200
 
 
+# NEW FEATURE: Secure Payment / Buy Sneaker
+@main.route("/api/sneakers/<int:sneaker_id>/buy", methods=["POST"])
+@jwt_required()
+def buy_sneaker(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.get(sneaker_id)
+    
+    if not sneaker or not sneaker.is_public_listing:
+        return jsonify({"message": "Sneaker not available"}), 404
 
+    # Update Status
+    sneaker.status = "Sold - Awaiting Shipment"
+    sneaker.is_public_listing = False
+    
+    # Send Email to Seller
+    seller = User.query.get(sneaker.owner_id)
+    if seller and seller.email:
+        try:
+            msg = Message(
+                subject="Payment Secured! Your sneaker sold.",
+                sender=current_app.config.get("MAIL_USERNAME"),
+                recipients=[seller.email],
+                body=f"Great news! Your {sneaker.brand} {sneaker.model} has been sold for ${sneaker.price}. Payment is secured. Please prepare for shipment!"
+            )
+            mail.send(msg)
+        except Exception as e:
+            # Fallback if mail configuration isn't set up yet on local PC
+            print("Email failed to send:", e) 
+            
+    db.session.commit()
+    return jsonify({"message": "Purchase successful!"}), 200
 
-#test to see if the worklow automation will be triggered on the push
+# NEW FEATURE: Release Funds
+@main.route("/api/vault/<int:sneaker_id>/release-funds", methods=["PUT"])
+@jwt_required()
+def release_funds(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+        
+    sneaker.status = "Funds Released"
+    db.session.commit()
+    
+    return jsonify({"message": "Funds Released", "sneaker": sneaker.to_dict()}), 200
+
+# NEW FEATURE: Decline Sale
+@main.route("/api/vault/<int:sneaker_id>/decline-sale", methods=["PUT"])
+@jwt_required()
+def decline_sale(sneaker_id):
+    current_user_id = int(get_jwt_identity())
+    sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
+    
+    if not sneaker:
+        return jsonify({"message": "Sneaker not found or unauthorized"}), 404
+        
+    # Revert the sneaker back to the public marketplace
+    sneaker.status = "active"
+    sneaker.is_public_listing = True
+    db.session.commit()
+    
+    return jsonify({"message": "Sale declined, item relisted", "sneaker": sneaker.to_dict()}), 200
