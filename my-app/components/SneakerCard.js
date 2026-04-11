@@ -130,6 +130,37 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
     }
   };
 
+  const handleReleaseFunds = async () => {
+    const token = localStorage.getItem("access_token");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/release-funds`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed");
+      if (refreshVault) refreshVault();
+    } catch (e) {
+      alert("Could not release funds");
+    }
+  };
+
+  // NEW FEATURE: Function to Decline Sale and Relist
+  const handleDeclineSale = async () => {
+    if (!window.confirm("Are you sure you want to decline this sale? The item will be relisted to the public marketplace.")) return;
+    
+    const token = localStorage.getItem("access_token");
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vault/${sneaker.id}/decline-sale`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!response.ok) throw new Error("Failed");
+      if (refreshVault) refreshVault();
+    } catch (e) {
+      alert("Could not decline sale");
+    }
+  };
+
   return (
     <Card className="h-100 border-0 premium-card overflow-hidden">
       <Carousel interval={null} indicators={true} className="bg-body-tertiary">
@@ -165,11 +196,19 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
             )}
             
             {isVaultView && (sneaker.status === "active" || (!sneaker.status && sneaker.isPublic)) && (
-              <Badge bg="success" className="px-2 py-1 shadow-sm">Live</Badge>
+              <Badge bg="success" className="px-2 py-1 shadow-sm">Active</Badge>
             )}
 
             {isVaultView && sneaker.status === "cancelled" && (
               <Badge bg="danger" className="px-2 py-1 shadow-sm">Cancelled</Badge>
+            )}
+
+            {isVaultView && sneaker.status === "Sold - Awaiting Shipment" && (
+              <Badge bg="info" className="px-2 py-1 shadow-sm text-white">Sold - Awaiting Shipment</Badge>
+            )}
+
+            {isVaultView && sneaker.status === "Funds Released" && (
+              <Badge bg="success" className="px-2 py-1 shadow-sm">Funds Released</Badge>
             )}
 
             {isVaultView && sneaker.status === "expired" && (
@@ -209,7 +248,7 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           </div>
         </Card.Text>
 
-        {isVaultView && (
+        {isVaultView && (sneaker.status === "draft" || sneaker.status === "active") && (
           <Button variant="outline-secondary" size="sm" className="w-100 rounded-pill mb-2 fw-bold" onClick={() => { setNewPrice(sneaker.price); setShowPriceModal(true); }}>
             ✏️ Edit Price
           </Button>
@@ -225,6 +264,18 @@ export default function SneakerCard({ sneaker, isVaultView, refreshVault }) {
           <Button variant="outline-danger" className="w-100 mt-auto fw-bold py-2 rounded-pill shadow-sm" onClick={handleCancelListing}>
             Cancel Listing
           </Button>
+        )}
+
+        {/* NEW FEATURE: Replaced the single Release button with a row containing Decline and Release */}
+        {isVaultView && sneaker.status === "Sold - Awaiting Shipment" && (
+          <div className="d-flex gap-2 mt-auto">
+            <Button variant="danger" className="flex-grow-1 fw-bold py-2 rounded-pill shadow-sm" onClick={handleDeclineSale}>
+              Decline Sale
+            </Button>
+            <Button variant="info" className="flex-grow-1 fw-bold py-2 rounded-pill shadow-sm text-white" onClick={handleReleaseFunds}>
+              Confirm & Release
+            </Button>
+          </div>
         )}
 
         {isVaultView && (sneaker.status === "cancelled" || sneaker.status === "expired") && (

@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import useSWR from "swr";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAtomValue } from "jotai";
 import { themeAtom } from "@/store/store";
 import { Container, Row, Col, Card, Badge } from "react-bootstrap";
@@ -17,6 +17,9 @@ export default function SneakerDetails() {
   const router = useRouter();
   const { id } = router.query;
   const theme = useAtomValue(themeAtom);
+  
+  // NEW FEATURE: State for loading button
+  const [isBuying, setIsBuying] = useState(false);
 
   useEffect(() => {
     document.documentElement.setAttribute("data-bs-theme", theme);
@@ -30,6 +33,33 @@ export default function SneakerDetails() {
     id ? `${process.env.NEXT_PUBLIC_API_URL}/api/sneakers/${id}` : null,
     fetcher,
   );
+
+  // NEW FEATURE: Buy Logic connecting to new backend route
+  const handleBuy = async () => {
+    const token = localStorage.getItem("access_token");
+    if (!token) {
+        alert("Please login to buy sneakers");
+        router.push("/login");
+        return;
+    }
+    
+    setIsBuying(true);
+    try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/sneakers/${id}/buy`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (!response.ok) throw new Error("Failed to process transaction");
+        
+        alert("Payment Secured! The seller has been notified.");
+        router.push("/vault");
+    } catch (err) {
+        alert("Transaction failed");
+    } finally {
+        setIsBuying(false);
+    }
+  };
 
   return (
     <>
@@ -145,8 +175,13 @@ export default function SneakerDetails() {
                       </div>
                     </div>
                   </div>
-                  <button className="btn btn-primary w-100 fw-bold py-2 rounded-pill shadow-sm fs-5">
-                    Buy Now
+                  {/* NEW FEATURE: Replaced static button with dynamic click handler */}
+                  <button 
+                    onClick={handleBuy} 
+                    disabled={isBuying}
+                    className="btn btn-primary w-100 fw-bold py-2 rounded-pill shadow-sm fs-5"
+                  >
+                    {isBuying ? "Processing..." : "Buy Now"}
                   </button>
                 </Col>
               </Row>
