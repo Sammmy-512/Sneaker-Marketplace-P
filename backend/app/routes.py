@@ -208,7 +208,7 @@ def cancel_sneaker(sneaker_id):
 def relist_sneaker(sneaker_id):
     current_user_id = int(get_jwt_identity())
     sneaker = Sneaker.query.filter_by(id=sneaker_id, owner_id=current_user_id).first()
-    
+
     if not sneaker:
         return jsonify({"message": "Sneaker not found or unauthorized"}), 404
 
@@ -218,9 +218,30 @@ def relist_sneaker(sneaker_id):
     sneaker.quantity = int(new_quantity)
     sneaker.is_public_listing = True
     sneaker.status = "active"
-    
+
+    # Notify buyers whose wishlist criteria match this relisted sneaker
+    all_criteria = WishlistCriteria.query.filter(WishlistCriteria.user_id != current_user_id).all()
+    for criteria in all_criteria:
+        if criteria.brand and criteria.brand.lower() != sneaker.brand.lower():
+            continue
+        if criteria.model_keyword and criteria.model_keyword.lower() not in sneaker.model.lower():
+            continue
+        if criteria.min_size and sneaker.size < criteria.min_size:
+            continue
+        if criteria.max_size and sneaker.size > criteria.max_size:
+            continue
+        if criteria.min_price and float(sneaker.price) < float(criteria.min_price):
+            continue
+        if criteria.max_price and float(sneaker.price) > float(criteria.max_price):
+            continue
+        db.session.add(Notification(
+            user_id=criteria.user_id,
+            message=f"New match for your wishlist \"{criteria.label}\": {sneaker.brand} {sneaker.model}, Size {sneaker.size}, ${float(sneaker.price):.2f}",
+            sneaker_id=sneaker.id
+        ))
+
     db.session.commit()
-    
+
     return jsonify({"message": "Sneaker relisted successfully", "sneaker": sneaker.to_dict()}), 200
 
 @main.route("/api/vault/<int:sneaker_id>", methods=["DELETE"])
