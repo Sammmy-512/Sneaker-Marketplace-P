@@ -30,6 +30,8 @@ def upgrade():
     sa.Column('image_front', sa.String(length=255), nullable=True),
     sa.Column('image_side', sa.String(length=255), nullable=True),
     sa.Column('image_sole', sa.String(length=255), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=True),
+    sa.Column('status', sa.String(length=20), nullable=True),
     sa.PrimaryKeyConstraint('id')
     )
     # ### end Alembic commands ###

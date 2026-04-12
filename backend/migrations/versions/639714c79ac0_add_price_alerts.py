@@ -26,10 +26,13 @@ def upgrade():
     sa.Column('target_price', sa.Numeric(precision=10, scale=2), nullable=True),
     sa.Column('is_active', sa.Boolean(), nullable=True),
     sa.Column('created_at', sa.DateTime(), nullable=True),
+    sa.Column('quantity', sa.Integer(), nullable=True),
+    sa.Column('status', sa.String(length=20), nullable=True),
     sa.ForeignKeyConstraint(['sneaker_id'], ['sneakers.id'], ),
     sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
     sa.PrimaryKeyConstraint('id')
     )
+    
     # ### end Alembic commands ###
 
 

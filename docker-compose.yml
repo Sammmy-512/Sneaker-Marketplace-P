@@ -1,0 +1,33 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: sneaker-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sneaker_marketplace
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sneaker-backend
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/sneaker_marketplace
+      SECRET_KEY: dev-secret
+      JWT_SECRET_KEY: super-secret-jwt-key
+    ports:
+      - "5000:5000"
+
+volumes:
+  postgres_data:
