@@ -6,6 +6,7 @@
 </div>
 
 ---
+## Here is the link for the application: https://project-1-btp405naa-group8-g5bq.vercel.app/
 
 ## 📂 Project Structure
 * **backend/** - Flask backend API
