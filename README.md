@@ -6,6 +6,9 @@
 </div>
 
 ---
+## Here is the link for the application: https://project-1-btp405naa-group8-g5bq.vercel.app/
+## Login email is: sam@example.com
+## Login password is: password123
 
 ## 📂 Project Structure
 * **backend/** - Flask backend API

@@ -112,8 +112,7 @@ def add_to_vault():
             unique_filename = f"{current_user_id}_{filename}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
             image_file.save(filepath)
-            return f"http://{current_app.config['BACKEND_URL']}/static/uploads/{unique_filename}"
-            #return f"http://localhost:5000/static/uploads/{unique_filename}"
+            return f"http://localhost:5000/static/uploads/{unique_filename}"
         return None
 
     image_front = save_image(request.files.get("image_front"))
