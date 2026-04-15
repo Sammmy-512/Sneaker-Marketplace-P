@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash, generate_password_hash
 
+
 # NEW FEATURE: Import mail and Message
 from app import db, mail
 from flask_mail import Message
@@ -111,7 +112,8 @@ def add_to_vault():
             unique_filename = f"{current_user_id}_{filename}"
             filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], unique_filename)
             image_file.save(filepath)
-            return f"http://localhost:5000/static/uploads/{unique_filename}"
+            return f"http://{current_app.config['BACKEND_URL']}/static/uploads/{unique_filename}"
+            #return f"http://localhost:5000/static/uploads/{unique_filename}"
         return None
 
     image_front = save_image(request.files.get("image_front"))
