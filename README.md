@@ -6,7 +6,7 @@
 </div>
 
 ---
-## Here is the link for the application: https://project-1-btp405naa-group8-g5bq.vercel.app/
+## Here is the link for the application: https://sneakr-mrkt.vercel.app/
 ## Login email is: sam@example.com
 ## Login password is: password123
 
